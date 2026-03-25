@@ -206,6 +206,29 @@
       </div>
     </div>
 
+    <!-- US Chart + Breakdown Row -->
+    <div class="chart-breakdown-grid" style="display:grid; grid-template-columns:1fr 2fr; gap:18px; margin-bottom:22px;">
+
+      <!-- Donut Chart (US) -->
+      <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+        <h2 style="font-size:14px; font-weight:600; color:#f1f5f9; margin:0 0 16px;">US — Allocation</h2>
+        <div style="position:relative; height:230px;">
+          <canvas id="usChart"></canvas>
+          <div id="usChartNoData" style="position:absolute; inset:0; align-items:center; justify-content:center; display:none;">
+            <span style="color:#475569; font-size:13px;">No US data</span>
+          </div>
+        </div>
+        <div id="usChartLegend" style="margin-top:14px; display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+
+      <!-- Category Breakdown Bars (US) -->
+      <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; padding:20px;">
+        <h2 style="font-size:14px; font-weight:600; color:#f1f5f9; margin:0 0 16px;">US — Category Breakdown</h2>
+        <div id="usCategoryBreakdown" style="display:flex; flex-direction:column; gap:14px;"></div>
+      </div>
+
+    </div>
+
     <!-- US Table -->
     <div style="background:#1e293b; border:1px solid #334155; border-radius:12px; overflow:hidden; margin-bottom:32px;">
       <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid #334155;">
@@ -290,6 +313,7 @@ const BADGE_CLASS = {
 // ── Global mutable state ───────────────────────────────────────────
 let allRows   = [];   // full parsed + categorised dataset
 let chartInst = null; // active Chart.js instance (kept to destroy before rebuild)
+let usChartInst = null; // active Chart.js instance for US chart
 
 
 // ══════════════════════════════════════════════════════════════════════
@@ -836,6 +860,142 @@ function renderTable(rows, tbodyId, emptyId, isIndia) {
 
 
 // ══════════════════════════════════════════════════════════════════════
+// 7b. DONUT CHART (US)
+// ══════════════════════════════════════════════════════════════════════
+
+function buildUSChart(usRows) {
+  const catTotals = {};
+  for (const r of usRows) {
+    catTotals[r.category] = (catTotals[r.category] || 0) + r.investmentAmount;
+  }
+
+  const labels = [], values = [], colors = [];
+  for (const cat of ALL_CATEGORIES) {
+    if (catTotals[cat]) {
+      labels.push(cat);
+      values.push(catTotals[cat]);
+      colors.push(CATEGORY_COLORS[cat]);
+    }
+  }
+
+  if (usChartInst) {
+    usChartInst.destroy();
+    usChartInst = null;
+  }
+
+  const canvas   = document.getElementById('usChart');
+  const noData   = document.getElementById('usChartNoData');
+  const legendEl = document.getElementById('usChartLegend');
+
+  if (!values.length) {
+    canvas.style.display = 'none';
+    noData.style.display = 'flex';
+    legendEl.innerHTML   = '';
+    return;
+  }
+
+  canvas.style.display = 'block';
+  noData.style.display = 'none';
+
+  const total = values.reduce((a, b) => a + b, 0);
+  const ctx   = canvas.getContext('2d');
+
+  usChartInst = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data:            values,
+        backgroundColor: colors,
+        borderColor:     '#1e293b',
+        borderWidth:     3,
+        hoverOffset:     12,
+      }],
+    },
+    options: {
+      responsive:          true,
+      maintainAspectRatio: false,
+      cutout:              '62%',
+      animation:           { animateScale: true },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = ((ctx.raw / total) * 100).toFixed(1);
+              return `  ${ctx.label}: ${formatUSD(ctx.raw)}  (${pct}%)`;
+            },
+          },
+          backgroundColor: '#0f172a',
+          titleColor:      '#94a3b8',
+          bodyColor:       '#f1f5f9',
+          borderColor:     '#334155',
+          borderWidth:     1,
+          padding:         10,
+        },
+      },
+    },
+  });
+
+  legendEl.innerHTML = labels.map((lbl, i) => {
+    const pct = ((values[i] / total) * 100).toFixed(0);
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div style="display:flex; align-items:center; gap:7px; min-width:0; overflow:hidden;">
+          <span style="width:9px; height:9px; border-radius:50%; flex-shrink:0; background:${colors[i]};"></span>
+          <span style="font-size:11px; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${esc(lbl)}</span>
+        </div>
+        <span style="font-size:11px; color:#64748b; flex-shrink:0;">${pct}%</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 8b. CATEGORY BREAKDOWN PROGRESS BARS (US)
+// ══════════════════════════════════════════════════════════════════════
+
+function buildUSCategoryBreakdown(usRows) {
+  const catTotals = {}, catCounts = {};
+  for (const r of usRows) {
+    catTotals[r.category] = (catTotals[r.category] || 0) + r.investmentAmount;
+    catCounts[r.category] = (catCounts[r.category] || 0) + 1;
+  }
+
+  const total     = Object.values(catTotals).reduce((a, b) => a + b, 0);
+  const container = document.getElementById('usCategoryBreakdown');
+
+  if (!total) {
+    container.innerHTML = '<p style="color:#475569; font-size:13px;">No US data to display.</p>';
+    return;
+  }
+
+  const activeCats = ALL_CATEGORIES.filter(c => catTotals[c]);
+
+  container.innerHTML = activeCats.map(cat => {
+    const pct = ((catTotals[cat] / total) * 100).toFixed(1);
+    const col = CATEGORY_COLORS[cat];
+    const cnt = catCounts[cat];
+    return `
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px;">
+          <div style="display:flex; align-items:center; gap:7px;">
+            <span style="width:9px; height:9px; border-radius:50%; background:${col}; flex-shrink:0;"></span>
+            <span style="font-size:13px; color:#e2e8f0; font-weight:500;">${esc(cat)}</span>
+          </div>
+          <span style="font-size:12px; color:#64748b; white-space:nowrap; padding-left:8px;">
+            ${formatUSD(catTotals[cat])} &nbsp;&middot;&nbsp; <span style="color:#475569;">${cnt} item${cnt !== 1 ? 's' : ''} &middot; ${pct}%</span>
+          </span>
+        </div>
+        <div style="background:#334155; border-radius:6px; height:5px; overflow:hidden;">
+          <div class="bar-fill" style="background:${col}; height:100%; border-radius:6px; width:${pct}%;"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // 9. FILTERS
 // ══════════════════════════════════════════════════════════════════════
 
@@ -875,6 +1035,10 @@ function applyFilters() {
   // Refresh India chart + breakdown to reflect filtered India subset
   buildChart(indiaRows);
   buildCategoryBreakdown(indiaRows);
+
+  // Refresh US chart + breakdown to reflect filtered US subset
+  buildUSChart(usRows);
+  buildUSCategoryBreakdown(usRows);
 }
 
 function clearFilters() {
