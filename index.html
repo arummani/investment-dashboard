@@ -132,7 +132,7 @@
           <select id="filterCategory" onchange="applyFilters()" class="filter-input"
             style="background:#334155; border:1px solid #475569; border-radius:8px; padding:7px 12px; font-size:13px; color:#e2e8f0; cursor:pointer;">
             <option value="All">All Categories</option>
-            <option value="Insurance">Insurance</option>
+            <option value="SIP">SIP</option>
             <option value="Mutual Funds / SIP">Mutual Funds / SIP</option>
             <option value="Equity / Shares">Equity / Shares</option>
             <option value="Deposits / Savings">Deposits / Savings</option>
@@ -289,7 +289,7 @@ const TAB_GID  = '0';
 
 /** Colours assigned to each portfolio category */
 const CATEGORY_COLORS = {
-  'Insurance':          '#f59e0b',
+  'SIP':          '#f59e0b',
   'Mutual Funds / SIP': '#3b82f6',
   'Equity / Shares':    '#10b981',
   'Deposits / Savings': '#8b5cf6',
@@ -302,7 +302,7 @@ const ALL_CATEGORIES = Object.keys(CATEGORY_COLORS);
 
 /** Badge CSS class per category */
 const BADGE_CLASS = {
-  'Insurance':          'badge-insurance',
+  'SIP':          'badge-insurance',
   'Mutual Funds / SIP': 'badge-mf',
   'Equity / Shares':    'badge-equity',
   'Deposits / Savings': 'badge-deposits',
@@ -465,10 +465,10 @@ function deriveCategory(row) {
     return 'Retirement';
   }
 
-  // ── 2. Insurance ──────────────────────────────────────────────────
-  // ULIP → always Insurance
-  // SIP with a Life Cover amount → Insurance-linked SIP
-  // Known insurance company/type keywords → Insurance
+  // ── 2. SIP ──────────────────────────────────────────────────
+  // ULIP → always SIP
+  // SIP with a Life Cover amount → SIP
+  // Known insurance company/type keywords → SIP
   const insuranceKeywords = [
     'ulip', 'insurance', 'life cover', 'term plan', 'term insurance', 'endowment',
     'lic', 'tata aia', 'edelweiss tokio', 'edelweiss', 'tokio', 'bajaj allianz',
@@ -481,7 +481,7 @@ function deriveCategory(row) {
     (type.includes('sip') && hasLifeCover) ||
     insuranceKeywords.some(k => type.includes(k) || company.includes(k))
   ) {
-    return 'Insurance';
+    return 'SIP';
   }
 
   // ── 3. Equity / Shares ────────────────────────────────────────────
